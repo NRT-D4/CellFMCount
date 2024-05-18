@@ -124,7 +124,13 @@ venv.bak/
 .dmypy.json
 dmypy.json
 
+# logs
+logs/
+
 # Checkpoint files
 *.pth
 *.pt
+*.ckpt
 
+# Hidden files
+.*

@@ -515,10 +515,3 @@ class CellCoder(ImageEncoderViT):
         return torch.mean(_output, axis=-1), output, extracted_layers
     
 
-# enc = CellCoder(extract_layers=[3, 6, 9, 12])
-
-# rand_input = torch.rand(1, 3, 640, 640)
-# output = enc(rand_input)
-# print(output[0].shape)
-# print(output[1].shape)
-# print(len(output[2]))
