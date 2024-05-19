@@ -100,7 +100,6 @@ class LightningViTCounter(pl.LightningModule):
         x = self.density_head(x[1]) # x[1] is the output of the encoder
         return x
     
-
     def training_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self(x)
@@ -138,8 +137,9 @@ class LightningViTCounter(pl.LightningModule):
 
     
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        return optimizer
+        optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr, weight_decay=0.01)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(optimizer, T_0=50, T_mult=2)
+        return [optimizer], [scheduler]
     
 
     def init_vit_b(self):
