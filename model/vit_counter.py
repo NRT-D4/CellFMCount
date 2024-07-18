@@ -1,6 +1,4 @@
 from functools import partial
-from pathlib import Path
-from typing import List, Literal, Tuple, Union
 
 
 import torch
@@ -10,7 +8,7 @@ from torch.utils.data import DataLoader
 
 import lightning as pl
 
-from .image_encoder import CellCoder, ImageEncoderViT
+from .image_encoder import CellCoder
 from data_handler import cellDataset
 
 class LightningViTCounter(pl.LightningModule):
