@@ -14,6 +14,7 @@ from data_handler import cellDataset
 class LightningViTCounter(pl.LightningModule):
     def __init__(self,train_images_list,val_images_list,test_images_list,config):
         super(LightningViTCounter, self).__init__()
+        # Load hyperparameters
         self.hyperparameters = config
         self.vit_structure = self.hyperparameters['vit_structure'] # Segment Anything Model (SAM) Encoder variant
         self.conv_layers = self.hyperparameters['conv_layers'] # Number of convolutional layers
@@ -24,8 +25,12 @@ class LightningViTCounter(pl.LightningModule):
         self.train_images_list = train_images_list
         self.val_images_list = val_images_list
         self.test_images_list = test_images_list
+        self.input_channels = 3
+        self.mlp_ratio = 4
+        self.qkv_bias = True
+        self.prompt_embed_dim = 256
 
-
+        # Select the correct ViT variant
         if self.vit_structure.upper() == "SAM-B":
             self.init_vit_b()
         elif self.vit_structure.upper() == "SAM-L":
@@ -33,12 +38,8 @@ class LightningViTCounter(pl.LightningModule):
         elif self.vit_structure.upper() == "SAM-H":
             self.init_vit_h()
 
-        self.input_channels = 3
-        self.mlp_ratio = 4
-        self.qkv_bias = True
-
-        self.prompt_embed_dim = 256
-
+        
+        # Initialize the ViT encoder
         self.encoder = CellCoder(
             extract_layers = self.extract_layers,
             depth=self.depth,
@@ -53,10 +54,13 @@ class LightningViTCounter(pl.LightningModule):
             out_chans=self.prompt_embed_dim
         )
 
+        # Initialize the density head
         self.density_head = self.make_conv_layers()
 
+        # Set the loss function
         self.loss = nn.MSELoss(reduction='sum')
 
+        # Lists to store the differences between the predicted and actual counts
         self.validation_diffs = []
         self.test_diffs = []
 
