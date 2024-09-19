@@ -94,6 +94,9 @@ class ImageEncoderViT(nn.Module):
             )
             self.blocks.append(block)
 
+
+        #Following standard practices (e.g., [40]), we use an input resolution of 1024×1024 obtained by rescaling the image and padding the shorter side. The image embedding is therefore 64×64. To reduce the channel dimension, following [62], we use a 1×1 convolution to get to 256 channels, followed by a 3×3 convolution also with 256 channels. Each convolution is followed by a layer normalization [4].
+
         self.neck = nn.Sequential(
             nn.Conv2d(
                 embed_dim,
