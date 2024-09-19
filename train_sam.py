@@ -89,8 +89,6 @@ def train_model(args):
         "freeze": args.freeze,
     }
 
-    print("Config:", config)
-
     # We will now initialize the model
     model = LightningViTCounter(
         config=config,
@@ -121,6 +119,9 @@ def train_model(args):
         logger=wandb_logger,
         callbacks=[checkpoint_callback],
     )
+
+    # log the config
+    wandb.config.update(config)
 
     # Fit the model
     trainer.fit(model)
