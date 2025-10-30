@@ -1,4 +1,7 @@
 from functools import partial
+from pathlib import Path
+from typing import List, Literal, Tuple, Union
+from torch.utils.data import random_split
 
 
 import torch
@@ -8,13 +11,12 @@ from torch.utils.data import DataLoader
 
 import lightning as pl
 
-from .image_encoder import CellCoder
+from .image_encoder import CellCoder, ImageEncoderViT
 from data_handler import cellDataset
 
 class LightningViTCounter(pl.LightningModule):
     def __init__(self,train_images_list,val_images_list,test_images_list,config):
         super(LightningViTCounter, self).__init__()
-        # Load hyperparameters
         self.hyperparameters = config
         self.vit_structure = self.hyperparameters['vit_structure'] # Segment Anything Model (SAM) Encoder variant
         self.conv_layers = self.hyperparameters['conv_layers'] # Number of convolutional layers
@@ -25,12 +27,8 @@ class LightningViTCounter(pl.LightningModule):
         self.train_images_list = train_images_list
         self.val_images_list = val_images_list
         self.test_images_list = test_images_list
-        self.input_channels = 3
-        self.mlp_ratio = 4
-        self.qkv_bias = True
-        self.prompt_embed_dim = 256
 
-        # Select the correct ViT variant
+
         if self.vit_structure.upper() == "SAM-B":
             self.init_vit_b()
         elif self.vit_structure.upper() == "SAM-L":
@@ -38,8 +36,12 @@ class LightningViTCounter(pl.LightningModule):
         elif self.vit_structure.upper() == "SAM-H":
             self.init_vit_h()
 
-        
-        # Initialize the ViT encoder
+        self.input_channels = 3
+        self.mlp_ratio = 4
+        self.qkv_bias = True
+
+        self.prompt_embed_dim = 256
+
         self.encoder = CellCoder(
             extract_layers = self.extract_layers,
             depth=self.depth,
@@ -54,13 +56,10 @@ class LightningViTCounter(pl.LightningModule):
             out_chans=self.prompt_embed_dim
         )
 
-        # Initialize the density head
         self.density_head = self.make_conv_layers()
 
-        # Set the loss function
         self.loss = nn.MSELoss(reduction='sum')
 
-        # Lists to store the differences between the predicted and actual counts
         self.validation_diffs = []
         self.test_diffs = []
 
@@ -113,7 +112,7 @@ class LightningViTCounter(pl.LightningModule):
         x, y = batch
         y_hat = self(x)
         loss = self.loss(y_hat.sum(), y.sum())
-        abs_diff = torch.abs(y_hat.sum() - y.sum())
+        abs_diff = torch.abs(y_hat.sum(dim=(2, 3)) - y.sum(dim=(2, 3)))
         self.validation_diffs.append(abs_diff)
         self.log('val_loss', loss, prog_bar=True)
         return loss
@@ -121,19 +120,22 @@ class LightningViTCounter(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         x, y = batch
         y_hat = self(x)
-        loss = self.loss(y_hat.sum(), y.sum())
-        abs_diff = torch.abs(y_hat.sum() - y.sum())
-        self.test_diffs.append(abs_diff)
+        gt_sum = torch.round(y.sum())
+        pred_sum = y_hat.sum()
+        loss = self.loss(pred_sum, gt_sum)
+        abs_diff = torch.abs(torch.round(pred_sum) - gt_sum)
+        print(f"GT: {gt_sum}, Pred: {pred_sum}")
+        self.test_diffs.append(abs_diff.unsqueeze(0))
         self.log('test_loss', loss, prog_bar=True)
         return loss
     
     def on_validation_epoch_end(self):
-        mae = torch.stack(self.validation_diffs).mean()
+        mae = torch.cat([x for x in self.validation_diffs]).mean()
         self.log('val_mae', mae, prog_bar=True)
         self.validation_diffs = []
 
     def on_test_epoch_end(self):
-        mae = torch.stack(self.test_diffs).mean()
+        mae = torch.cat([x for x in self.test_diffs]).mean()
         self.log('test_mae', mae, prog_bar=True)
         self.test_diffs = []
 
@@ -167,6 +169,12 @@ class LightningViTCounter(pl.LightningModule):
 
     def prepare_data(self):
         self.train_dataset = cellDataset(self.train_images_list)
+
+        # Split the dataset into train and validation
+        train_size = int(0.8 * len(self.train_dataset))
+        val_size = len(self.train_dataset) - train_size
+        self.train_dataset, self.val_dataset = random_split(self.train_dataset, [train_size, val_size])
+
         self.test_dataset = cellDataset(self.test_images_list)
 
     def train_dataloader(self):
@@ -176,4 +184,4 @@ class LightningViTCounter(pl.LightningModule):
         return DataLoader(self.test_dataset, batch_size=1, shuffle=False, num_workers=4)
     
     def val_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=1, shuffle=False, num_workers=4)
+        return DataLoader(self.val_dataset, batch_size=1, shuffle=False, num_workers=4)

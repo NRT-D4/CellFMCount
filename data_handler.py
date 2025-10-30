@@ -26,7 +26,7 @@ class cellDataset(Dataset):
 
         img = cv2.imread(img_path)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = cv2.resize(img, (256, 256))
+        img = cv2.resize(img, (1024, 1024))
 
         gt_path = img_path.replace("images", "densities").replace(".png", ".h5")
         gt_file = h5py.File(gt_path, 'r')
@@ -40,13 +40,41 @@ class cellDataset(Dataset):
         gt = torch.from_numpy(gt).unsqueeze(0)
 
         return img, gt
-    
 
-# # Test the dataset
+class embeddingDataset(Dataset):
+    def __init__(self, images_list, transform=None):
+        self.images_list = images_list
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.images_list)
+    
+    def __getitem__(self, idx):
+        img_path = self.images_list[idx]
+
+        # load embeddings 
+        embeddings_path = img_path.replace("images", "embeddings").replace(".png", ".npy")
+        embeddings = torch.load(embeddings_path).squeeze(0)
+
+        gt_path = img_path.replace("images", "densities").replace(".png", ".h5")
+        gt_file = h5py.File(gt_path, 'r')
+        gt = np.asarray(gt_file['density'])
+        
+
+        gt = cv2.resize(gt, (gt.shape[1]//16, gt.shape[0]//16),interpolation= cv2.INTER_AREA) * (16**2)
+        gt = gt.astype(np.float32)
+        
+
+        # Convert to tensor
+        gt = torch.from_numpy(gt).unsqueeze(0)
+
+        return embeddings, gt
+
+# Test the dataset
 
 # from glob import glob
 
-# images_list = glob("../Datasets/DCC/trainval/images/*.png")
+# images_list = glob("/Users/abdu/Desktop/Research/Datasets/Cell Datasets/v3_dapi/resized/trainval/images/*.png")
 
 # print(f"Total images: {len(images_list)}")
 
@@ -54,24 +82,10 @@ class cellDataset(Dataset):
 #     transforms.RandomHorizontalFlip()
 # ])
 
-# dataset = cellDataset(images_list, transform=transform)
+# dataset = embeddingDataset(images_list, transform=transform)
 
 # dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
 
 # for img, gt in dataloader:
-#     plt.figure(figsize=(10, 10))
-#     plt.subplot(1, 2, 1)
-#     plt.imshow(img[0].permute(1, 2, 0))
-#     plt.title("Image")
-#     plt.axis("off")
-#     plt.subplot(1, 2, 2)
-#     plt.imshow(gt[0].squeeze())
-#     plt.title(f"GT count: {gt[0].sum()}")
-#     plt.axis("off")
-#     plt.show()
-
+#     print(img.shape, gt.shape)
 #     break
-    
-
-
-
