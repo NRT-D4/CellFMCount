@@ -134,3 +134,6 @@ logs/
 
 # Hidden files
 .*
+
+# lightning logs
+lightning_logs/
